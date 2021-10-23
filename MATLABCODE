@@ -1,0 +1,140 @@
+%% This code is designed to read in an image in the ESRI ASCII GRID format. It calculates the gradeint, slope, aspect for both 4 and 8 neighboring points.
+%% It also calculates the contour with an interval of 5 meters.
+
+%% reading in the image
+[imagedata,R] = arcgridread('rastert_extract2.grd');
+%imagedata=imagedata(500:1000,500:1000); %clipping data
+figure()
+mapshow(imagedata,R,'DisplayType','surface')
+title('Map of DEM Data')
+xlabel('Easting(m)')
+ylabel('Northing(m)')
+colorbar
+cell = 24.940;%cell size
+
+%% CALCULATING THE SLOPE FOR THE DEM
+padded_image = padarray(imagedata,[1 1],'both');
+
+% FILTERS FOR THE X AND Y GRADIENTS 
+filterX_4=[0,0,0;-1,0,1;0,0,0]; % x filter for 4 neighboring points
+filterY_4=[0,-1,0;0,0,0;0,1,0]; % y filter for 4 neighboring points
+filterX_8=[-1,0,1;-2,0,2;-1,0,1]; %x filter for 8 neighboring points
+filterY_8=[1,2,1;0,0,0;-1,-2,-1]; %y filter for 8 neighboring points
+
+%constructing an empty matrix for the gradients
+imagesize=size(imagedata);
+delX=zeros(imagesize(1),imagesize(2));
+delY=zeros(imagesize(1),imagesize(2));
+delXX=zeros(imagesize(1),imagesize(2));
+delYY=zeros(imagesize(1),imagesize(2));
+
+% FOUR NEIGHBORING POINTS
+
+   for row = 2:((height(padded_image)))-2
+        for col =2:((width(padded_image)))-2
+            matrix9=padded_image(row-1:row+1,col-1:col+1); %extracting a matrix of the same size as the filter
+            productX=matrix9.*filterX_4; % dot product
+            productY=matrix9.*filterY_4;
+            summationX=sum(sum(productX))/(2*cell);
+            summationY=sum(sum(productY))/(2*cell);% sum of the dot product
+            delX(row,col)=summationX;
+            delY(row,col)=summationY;
+        end
+    end
+
+slopeA = (sqrt((delX).^2 + (delY.^2)))*100; %PERCENTAGE SLOPE
+
+figure()
+mesh(slopeA)
+title('Four Neighboring Slope Map')
+xlabel('Columns'); ylabel('Rows')
+colorbar
+
+%gradient X in 4 neighbors
+figure()
+mesh(delX(2:end,2:end))
+title('Four Neighborhood X-Gradient Map')
+xlabel('Columns'); ylabel('Rows')
+colorbar
+
+%gradient Y in 4 neighbors
+figure()
+mesh(delY(2:end,2:end))
+title('Four Neighborhood Y-Gradient Map')
+xlabel('Columns'); ylabel('Rows')
+colorbar
+
+% EIGHT NEIGHBORING POINTS
+
+for row = 2:((height(padded_image)))-2
+        for col =2:((width(padded_image)))-2
+            matrix9=padded_image(row-1:row+1,col-1:col+1); %extracting a matrix of the same size as the filter
+            productXX=matrix9.*filterX_8; % dot product
+            productYY=matrix9.*filterY_8;
+            summationXX=sum(sum(productXX))/(8*cell);
+            summationYY=sum(sum(productYY))/(8*cell);% sum of the dot product
+            delXX(row,col)=summationXX;
+            delYY(row,col)=summationYY;
+        end
+end
+slopeB= (sqrt((delXX).^2 + (delYY).^2))*100;%slope in percentage
+
+figure()
+mesh(slopeB(2:end-1,2:end-1))%removing outliers
+title('Eight Neighboring Slope Map')
+xlabel('Columns'); ylabel('Rows')
+colorbar
+
+%gradient X in 8 neighbors
+figure()
+mesh(delXX(2:end-1,2:end-1))
+title('Eight Neighborhood X-Gradient Map')
+xlabel('Columns'); ylabel('Rows')
+colorbar
+
+%gradient Y in 8 neighbors
+figure()
+mesh(delYY(2:end-1,2:end-1))
+title('Eight Neighborhood Y-Gradient Map')
+xlabel('Columns'); ylabel('Rows')
+colorbar
+
+%% COMPUTING THE ASPECT 
+
+% four neighboring points
+aspectA = atan2d(delX,delY);
+aspectA = aspectA + (aspectA<0)*360;
+
+figure()
+mesh(aspectA)
+title('Four Neighboring Aspect Map')
+xlabel('Columns'); ylabel('Rows')
+colorbar
+
+% eight neighboring points
+aspectB = atan2d(delXX,delYY);
+aspectB = aspectB + (aspectB<0)*360;
+figure()
+mesh(aspectB)
+title('Eight Neighboring Aspect Map')
+xlabel('Columns'); ylabel('Rows');
+colorbar
+
+
+%% CREATING CONTOURS
+CI = 5; %Contour interval in meters
+hc_min = (min(min(imagedata)/CI)+1)*CI;
+hc_max = (max(max(imagedata)/CI)+1)*CI;
+hc = round((hc_min+hc_max)/2);
+class = round(((imagedata-hc_min)./CI)+1);
+class_hc = round(((hc-hc_min)./CI)+1);
+%converting to gray IMAGE
+grayimage = mat2gray(class,[13 class_hc]);
+contour = edge(grayimage);
+
+figure()
+mesh(1:568,1:567,contour)
+colorbar
+title('Map of Contour line at Elevation hc')
+legend('Countour Line')
+xlabel('Rows'); ylabel('Columns')
