@@ -1,2 +1,2 @@
-# 4640-Lab2
-This contains the MATLAB code used in the terrain analysis lab.
+# 4640-Labs
+This contains the MATLAB codes used in the ESSE 4640 LABS.
