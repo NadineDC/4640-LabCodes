@@ -1,0 +1,409 @@
+%% This code was programmed using global interpolation methods to determine trend surfaces of a DEM data. 
+%% QUESTION 1:READING IN THE FILE
+Read = importdata('Lab3_XYZ_F20201.txt');
+DEM = Read.data;
+
+%% QUESTION 2: GENERATING 2nd and 3rd ORDER TREND SURFACES
+X = DEM(:,1);
+Y = DEM(:,2); 
+Z = DEM(:,3);
+
+% Calculating the centroid and it's co-ordinates
+num = size(DEM,1);%number of observations
+
+%centroid calculation
+X_cen = sum(X)/num; 
+Y_cen = sum(Y)/num; 
+Z_cen = sum(Z)/num;
+
+%centroid coordinates
+X_cen_coord = X - X_cen; 
+Y_cen_coord = Y - Y_cen; 
+Z_cen_coord = Z - Z_cen;
+
+%normalized coordinates
+X_norm = (X-min(X))/(max(X)-min(X));
+Y_norm = (Y-min(Y))/(max(Y)-min(Y));
+Z_norm = (Z-min(Z))/(max(Z)-min(Z));
+
+% Calculating the coefficient matrix for the original, centroid and
+% normalised co-ordinates
+
+%SECOND ORDER
+for i = 1:num
+    A2(i,:) = [1 X(i) Y(i) X(i)^2 X(i)*Y(i) Y(i)^2];
+    A2_cen(i,:) = [1 X_cen_coord(i) Y_cen_coord(i) X_cen_coord(i)^2 X_cen_coord(i)*Y_cen_coord(i) Y_cen_coord(i)^2];
+    A2_norm(i,:) = [1 X_norm(i) Y_norm(i) X_norm(i)^2 X_norm(i)*Y_norm(i) Y_norm(i)^2];
+end
+
+%Calculating the unknown values for second order
+x = inv(A2'*A2)*A2'*Z;% original data
+x_cen = inv(A2_cen'*A2_cen)*A2_cen'*Z_cen_coord; %centroid coordinates
+x_norm = inv(A2_norm'*A2_norm)*A2_norm'*Z_norm; %b normalized data
+
+
+%THIRD ORDER
+for i = 1:num
+    A3(i,:) = [1 X(i) Y(i) X(i)^2 X(i)*Y(i) Y(i)^2 X(i)^3 X(i)^2*Y(i) X(i)*Y(i)^2 Y(i)^3];
+    A3_cen(i,:) = [1 X_cen_coord(i) Y_cen_coord(i) X_cen_coord(i)^2 X_cen_coord(i)*Y_cen_coord(i) Y_cen_coord(i)^2 X_cen_coord(i)^3 X_cen_coord(i)^2*Y_cen_coord(i) X_cen_coord(i)*Y_cen_coord(i)^2 Y_cen_coord(i)^3];
+    A3_norm(i,:) = [1 X_norm(i) Y_norm(i) X_norm(i)^2 X_norm(i)*Y_norm(i) Y_norm(i)^2 X_norm(i)^3 X_norm(i)^2*Y_norm(i) X_norm(i)*Y_norm(i)^2 Y_norm(i)^3];
+end
+
+%calculating the unknown values for third order
+x3 = inv(A3'*A3)*A3'*Z;%original
+x_cen3 = inv(A3_cen'*A3_cen)*A3_cen'*Z_cen_coord;%centroid
+x_norm3 = inv(A3_norm'*A3_norm)*A3_norm'*Z_norm;%normalized
+
+%% QUESTION 3 : COMPUTING THE ACCURACIES OF ESTIMATED COEFFICIENTS
+
+%SECOND ORDER
+%Calculating the corrected Z values in original, centroid and normalized coordinates
+
+Z_corrected = A2*x; 
+Z_cen_corrected= A2_cen*x_cen; 
+Z_norm_corrected = A2_norm*x_norm;
+
+%computing residuals
+v = Z_corrected-Z; 
+v_cen = Z_cen_corrected-Z_cen_coord; 
+v_norm = Z_norm_corrected -Z_norm;
+
+%computing aposteriori matrices
+DOF2 = 92-6;
+apost = ((v'*v)/DOF2)*inv(A2'*A2);%original coordiantes
+apost_cen = ((v_cen'*v_cen)/DOF2)*inv(A2_cen'*A2_cen);%centroid coordinates
+apost_norm = ((v_norm'*v_norm)/DOF2)*inv(A2_norm'*A2_norm);%normalized coordinates
+
+%accuracies of each coefficient:covariance matrices
+cov = apost*inv(A2'*A2);
+cov_cen = apost_cen*inv(A2_cen'*A2_cen);
+cov_norm = apost_norm*inv(A2_norm'*A2_norm);
+
+%standard deviation
+std2 = sqrt(diag(cov));
+std_cen2 = sqrt(diag(cov_cen));
+std_norm2 = sqrt(diag(cov_norm));
+
+%numerical stability
+stab2 = cond((A2'*A2));
+stab_cen2 = cond((A2_cen'*A2_cen));
+stab_norm2= cond((A2_norm'*A2_norm));
+
+
+%FOR THIRD ORDER
+%corrected z values
+Z3_corrected = A3*x3; %ORIGINAL COORDINATES
+Z3_cen_corrected = A3_cen*x_cen3; 
+Z3_norm_corrected = A3_norm*x_norm3;
+
+%computing residuals
+v3 = Z3_corrected-Z; 
+v3_cen = Z3_cen_corrected-Z_cen_coord; 
+v3_norm = Z3_norm_corrected-Z_norm;
+
+%computing accuracies
+DOF3 = 92-10;
+apost3 = ((v3'*v3)/DOF3)*inv(A3'*A3);%original coordiantes
+apost_cen3 = ((v3_cen'*v3_cen)/DOF3)*inv(A3_cen'*A3_cen);%centroid coordinates
+apost_norm3 = ((v3_norm'*v3_norm)/DOF3)*inv(A3_norm'*A3_norm);%normalized coordinates
+
+%accuracies of each coefficient:covariance matrices
+cov3 = apost3*inv(A3'*A3);
+cov3_cen = apost_cen3*inv(A3_cen'*A3_cen);
+cov3_norm = apost_norm3*inv(A3_norm'*A3_norm);
+
+%standard deviation
+std3 = sqrt(diag(cov3));
+std_cen3 = sqrt(diag(cov3_cen));
+std_norm3 = sqrt(diag(cov3_norm));
+
+%numerical stability
+stab3 = cond((A3'*A3));
+stab_cen3 = cond((A3_cen'*A3_cen));
+stab_norm3 = cond((A3_norm'*A3_norm));
+
+
+%% QUESTION 4 : ESTIMATED ELEVATIONS AND RESIDUALS
+%transferring centroid and normalized coordinates back to original
+%SECOND ORDER
+transZ_cen = Z_cen_corrected + Z_cen;%centroid
+max_Z = max(Z);
+min_Z = min(Z);%minimum and maximum original Z
+transZ_norm = Z_norm_corrected*(max_Z-min_Z) + min_Z;%normalized
+
+%residuals and residual statistics
+final_residual_1 = transZ_cen - Z; %centroid
+final_residual_2 = transZ_norm - Z; %normalized
+%mean
+sec_mean = mean(v);
+sec_mean_cen = mean(final_residual_1);
+sec_mean_norm = mean(final_residual_2);
+%standard deviation
+stan = std(v);
+stan_cen = std(final_residual_1);
+stan_norm = std(final_residual_2);
+%minimum
+min_var = min(v);
+min_var_cen = min(final_residual_1);
+min_var_norm = min(final_residual_2);
+%maximum
+max_var = max(v);
+max_var_cen = max(final_residual_1);
+max_var_norm = max(final_residual_2);
+%root-mean-squared error
+RMS = sqrt(mean((-v).^2));
+RMS_cen = sqrt(mean((-final_residual_1).^2));
+RMS_norm = sqrt(mean((-final_residual_2).^2));
+
+
+%THIRD ORDER
+trans_Z_cen3 = Z3_cen_corrected + Z_cen;%centroid
+trans_Z_norm3 = Z3_norm_corrected*(max_Z-min_Z) + min_Z;%normalized
+
+%residuals and residual statistics
+final_residual2_1 = trans_Z_cen3 - Z; %centroid
+final_residual2_2 = trans_Z_norm3 - Z; %normalized
+%mean
+th_mean = mean(v3);
+th_mean_cen = mean(final_residual2_1);
+th_mean_norm= mean(final_residual2_2);
+%standard deviation
+stan3 = std(v3);
+stan3_cen = std(final_residual2_1);
+stan3_norm = std(final_residual2_2);
+%minimum
+min_var3 = min(v3);
+min_var3_cen = min(final_residual2_1);
+min_var3_norm = min(final_residual2_2);
+%maximum
+max_var3 = max(v3);
+max_var3_cen = max(final_residual2_1);
+max_var3_norm = max(final_residual2_2);
+%root-mean-squared error
+RMS3 = sqrt(mean((-v3).^2));
+RMS3_cen = sqrt(mean((-final_residual2_1).^2));
+RMSE3_norm= sqrt(mean((-final_residual2_2).^2));
+
+
+%% QUESTION 5- WORTHINESS ESTIMATION OF ESTIMATED TREND SURFACES
+%SECOND ORDER
+%goodness-of-fit
+avg_Z = mean(Z);% average elevation as defined by the reference points
+SS_T = sum((Z - avg_Z).^2);%total sum of squares
+SS_R = sum((Z_corrected - avg_Z).^2);% regression sum of squares original
+SSD = SS_T - SS_R;%residual sum of squares original coordinates
+
+SS_R_cen = sum((transZ_cen - avg_Z).^2);%trend sum of squares centroid
+SS_R_norm = sum((transZ_norm - avg_Z).^2);%trend sum of squares normalized
+
+
+SS_D_cen = SS_T - SS_R_cen;%residual sum of squares centroid coordinates
+SS_D_norm = SS_T - SS_R_norm;%residual sum of squares normalized cooridinates
+
+R_square = SS_R/SS_T;
+R_square_cen = SS_R_cen/SS_T;
+R_square_norm = SS_R_norm/SS_T;
+
+%F statistic
+m = 6;%number of coefficients
+n = length(Z);%number of samples
+MS_T = SS_T/(n-1);%total variance
+MS_R = SS_R/(m-1);%trend variance for original coordinates
+MS_R_cen = SS_R_cen/(m-1);%trend variance for centroid coorinates
+MS_R_norm = SS_R_norm/(m-1);%trend variance for normalized coordinates
+
+MS_D = SSD/(n-m);%residual variance for original coordinates
+MS_D_cen = SS_D_cen/(n-m);%residual variance for centroid coordinates
+MS_D_norm = SS_D_norm/(n-m);%residual variance for normalized coordinates
+
+F = MS_R/MS_D;%F-statistic of original coordinates
+F_cen = MS_R_cen/MS_D_cen;%F-statistic of centroid coordinates
+F_norm = MS_R_norm/MS_D_norm;%F-statistic of normalized coordinates
+
+
+%THIRD ORDER
+%goodness-of-fit
+SS_R3 = sum((Z3_corrected-avg_Z).^2);%original
+SS_R3_cen = sum((trans_Z_cen3-avg_Z).^2);%centroid
+SS_R3_norm = sum((trans_Z_norm3-avg_Z).^2);%normalized
+
+SS_D3 = SS_T-SS_R3;%residual sum of squares original coordinates
+SS_D3_cen = SS_T - SS_R3_cen;%residual sum of squares centroid coordinates
+SS_D3_norm = SS_T - SS_R3_norm;%residual sum of squares normalized cooridinates
+R_squrae3 = SS_R3/SS_T;
+R_square_cen3 = SS_R3_cen/SS_T;
+R_square_norm3 = SS_R3_norm/SS_T;
+
+%F statistic
+m2 = 10;%number of coefficients
+MS_R3 = SS_R3/(m2-1);%trend variance for original coordinates
+MS_R3_cen = SS_R3_cen/(m2-1);%trend variance for centroid coorinates
+MS_R3_norm = SS_R3_norm/(m2-1);%trend variance for normalized coordinates
+MS_D3 = SS_D3/(n-m2);%residual variance for original coordinates
+MS_D3_cen = SS_D3_cen/(n-m2);%residual variance for centroid coordinates
+MS_D3_norm = SS_D3_norm/(n-m2);%residual variance for normalized coordinates
+
+F3 = MS_R3/MS_D3;%F-statistic of original coordinates
+F3_cen = MS_R3_cen/MS_D3_cen;%F-statistic of centroid coordinates
+F3_norm = MS_R3_norm/MS_D3_norm;%F-statistic of normalized coordinates
+
+%% QUESTION 7 - EVALUATING ELEVATIONS FOR EACH GIVEN POINT
+XA = 7000; YA = 3500;
+XB = 6350; YB = 5500;
+Xc = 8800; Yc = 2400;
+
+%centroid
+XAC = XA-X_cen; YAC = YA-Y_cen;
+XBC = XB-X_cen; YBC = YB-Y_cen;
+XCC = Xc-X_cen; YCC = Yc-Y_cen;
+
+%normalized
+XAN = (XA-min(X))/(max(X)-min(X));
+YAN = (YA-min(Y))/(max(Y)-min(Y));
+XBN = (XB-min(X))/(max(X)-min(X));
+YBN = (YB-min(Y))/(max(Y)-min(Y));
+XCN = (X_cen-min(X))/(max(X)-min(X));
+YCN = (Y_cen-min(Y))/(max(Y)-min(Y));
+
+%SECOND ORDER
+%original coordinates
+ZA = x(1)+ x(2)*XA + x(3)*YA + x(4)*XA^2 + x(5)*XA*YA + x(6)*YA^2;
+ZB = x(1)+ x(2)*XB + x(3)*YB + x(4)*XB^2 + x(5)*XB*YB + x(6)*YB^2;
+ZC = x(1)+ x(2)*Xc + x(3)*Yc + x(4)*Xc^2 + x(5)*Xc*Yc + x(6)*Yc^2;
+%centroid coordinates
+ZA_C = x_cen(1)+ x_cen(2)*XAC + x_cen(3)*YAC + x_cen(4)*XAC^2 + x_cen(5)*XAC*YAC + x_cen(6)*YAC^2;
+ZB_C = x_cen(1)+ x_cen(2)*XBC + x_cen(3)*YBC + x_cen(4)*XBC^2 + x_cen(5)*XBC*YBC + x_cen(6)*YBC^2;
+ZC_C = x_cen(1)+ x_cen(2)*XCC + x_cen(3)*YCC + x_cen(4)*XCC^2 + x_cen(5)*XCC*YCC + x_cen(6)*YCC^2;
+%normalized
+ZA_N = x_norm(1)+ x_norm(2)*XAN + x_norm(3)*YAN + x_norm(4)*XAN^2 + x_norm(5)*XAN*YAN + x_norm(6)*YAN^2;
+ZB_N = x_norm(1)+ x_norm(2)*XBN + x_norm(3)*YBN + x_norm(4)*XBN^2 + x_norm(5)*XBN*YBN + x_norm(6)*YBN^2;
+ZC_N = x_norm(1)+ x_norm(2)*XCN + x_norm(3)*YCN + x_norm(4)*XCN^2 + x_norm(5)*XCN*YCN + x_norm(6)*YCN^2;
+
+%final Z values for the centroid and normalised coordinates are goten by
+%transforming the estimated normalised and centroid coordinates
+fin_ZAC = ZA_C+ZC; 
+fin_ZBC = ZB_C+ZC; 
+fin_ZCC = ZC_C+ZC;
+fin_ZAN = ZA_N*(max_Z-min_Z)+min_Z; 
+fin_ZBN = ZB_N*(max_Z-min_Z)+min_Z; 
+fin_ZCN = ZC_N*(max_Z-min_Z)+min_Z;
+
+%THIRD ORDER
+%original coordinates
+ZA2 = x3(1)+ x3(2)*XA + x3(3)*YA + x3(4)*XA^2 + x3(5)*XA*YA + x3(6)*YA^2 +...
+    x3(7)*XA^3 + x3(8)*XA^2*YA + x3(9)*XA*YA^2 + x3(10)*YA^3;
+
+ZB2 = x3(1)+ x3(2)*XB + x3(3)*YB + x3(4)*XB^2 + x3(5)*XB*YB + x3(6)*YB^2 +...
+    x3(7)*XB^3 + x3(8)*XB^2*YB + x3(9)*XB*YB^2 + x3(10)*YB^3;
+
+ZC2 = x3(1)+ x3(2)*Xc + x3(3)*Yc + x3(4)*Xc^2 + x3(5)*Xc*Yc + x3(6)*Yc^2 +...
+    x3(7)*Xc^3 + x3(8)*Xc^2*Yc + x3(9)*Xc*Yc^2 + x3(10)*Yc^3;
+%centroid
+ZA2_C = x_cen3(1)+ x_cen3(2)*XAC + x_cen3(3)*YAC + x_cen3(4)*XAC^2 + x_cen3(5)*XAC*YAC + x_cen3(6)*YAC^2 +...
+    x_cen3(7)*XAC^3 + x_cen3(8)*XAC^2*YAC + x_cen3(9)*XAC*YAC^2 + x_cen3(10)*YAC^3;
+
+ZB2_C = x_cen3(1)+ x_cen3(2)*XBC + x_cen3(3)*YBC + x_cen3(4)*XBC^2 + x_cen3(5)*XBC*YBC + x_cen3(6)*YBC^2 +...
+    x_cen3(7)*XBC^3 + x_cen3(8)*XBC^2*YB + x_cen3(9)*XBC*YBC^2 + x_cen3(10)*YBC^3;
+
+ZC2_C = x_cen3(1)+ x_cen3(2)*XCC + x_cen3(3)*YCC + x_cen3(4)*XCC^2 + x_cen3(5)*XCC*YCC + x_cen3(6)*YCC^2 +...
+    x_cen3(7)*XCC^3 + x_cen3(8)*XCC^2*YCC + x_cen3(9)*XCC*YCC^2 + x_cen3(10)*YCC^3;
+%normalized
+ZA2_N = x_norm3(1)+ x_norm3(2)*XAN + x_norm3(3)*YAN + x_norm3(4)*XAN^2 + x_norm3(5)*XAN*YAN + x_norm3(6)*YAN^2 +...
+    x_norm3(7)*XAN^3 + x_norm3(8)*XAN^2*YAN + x_norm3(9)*XAN*YAN^2 + x_norm3(10)*YAN^3;
+
+ZB2_N = x_norm3(1)+ x_norm3(2)*XBN + x_norm3(3)*YBN + x_norm3(4)*XBN^2 + x_norm3(5)*XBN*YBN + x_norm3(6)*YBN^2 +...
+    x_norm3(7)*XBN^3 + x_norm3(8)*XBN^2*YBN + x_norm3(9)*XBN*YBN^2 + x_norm3(10)*YBN^3;
+
+ZC2_N = x_norm3(1)+ x_norm3(2)*XCN + x_norm3(3)*YCN + x_norm3(4)*XCN^2 + x_norm3(5)*XCN*YCN + x_norm3(6)*YCN^2 +...
+    x_norm3(7)*XCN^3 + x_norm3(8)*XCN^2*YCN + x_norm3(9)*XCN*YCN^2 + x_norm3(10)*YCN^3;
+
+%final Z values
+fin_ZAC2 = ZA2_C+ZC; 
+fin_ZBC2 = ZB2_C+ZC;
+fin_ZCC2 = ZC2_C+ZC;
+fin_ZAN2 = ZA2_N*(max_Z-min_Z)+min_Z; 
+fin_ZBN2 = ZB2_N*(max_Z-min_Z)+min_Z; 
+fin_ZCN2 = ZC2_N*(max_Z-min_Z)+min_Z;
+
+%% PART 6 - PLOTS OF POINTS, SURFACES, CONTOURS AND RESIDUALS
+figure()
+scatter(X,Y,'filled')
+xlabel('X(Metres)'); ylabel('Y(Metres)')
+title('Planimetric Distribution of Given Elevation Points')
+
+figure()
+scatter(transZ_cen,final_residual_1,'filled')
+xlabel('Elevation (Metres)'); ylabel('Residual(Metres)')
+title('Second Order Centroid Coordinates Residuals vs Elevation')
+
+figure()
+scatter(transZ_norm,final_residual_2,'filled')
+xlabel('Elevation (Metres)'); ylabel('Residual(Metres)')
+title('Second Order Normalised Coordinates Residuals vs Elevation')
+
+
+figure()
+scatter(Z_corrected,v,'filled')
+xlabel('Elevation (Metres)'); ylabel('Residual(Metres)')
+title('Second Order Original Coordinates Residuals vs Elevation')
+
+figure()
+scatter(Z3_corrected,v3,'filled')
+xlabel('Elevation (Metres)'); ylabel('Residual(Metres)')
+title('Third Order Original Coordinates Residuals vs Elevation')
+
+figure()
+scatter(trans_Z_cen3,final_residual2_1,'filled')
+xlabel('Elevation (Metres)'); ylabel('Residual(Metres)')
+title('Third Order Centroid Coordinates Residuals vs Elevation')
+
+figure()
+scatter(trans_Z_norm3,final_residual2_2,'filled')
+xlabel('Elevation (Metres)'); ylabel('Residual(Metres)')
+title('Third Order Normalised Coordinates Residuals vs Elevation')
+
+%Plots of Trend Surfaces, Residuals and Contours
+%Original Coordinates
+visualization(X,Y,Z)
+
+%Second Order Trend Surface:Original
+visualization(X,Y,Z_corrected)
+%Second Order Trend Surface:Centroid
+visualization(X,Y,transZ_cen)
+%Second Order Trend Surface:Normalized
+visualization(X,Y,transZ_norm)
+
+%Third Order Trend Surface:Original
+visualization(X,Y,Z3_corrected)
+%Third Order Trend Surface:Centroid
+visualization(X,Y,trans_Z_cen3)
+%Third Order Trend Surface:Normalized
+visualization(X,Y,trans_Z_norm3)
+
+
+function visualization (X,Y,Z)
+ 
+%Grid Data
+x_x = linspace(min(X),max(X),92);
+y_y = linspace(min(Y),max(Y),92);
+[Xgrid,Ygrid] = meshgrid(x_x,y_y);
+Zgrid = griddata(X,Y,Z,Xgrid,Ygrid,'cubic');
+
+%contour plots
+interval = min(Z):2:max(Z);
+figure()
+contour(Xgrid,Ygrid,Zgrid,interval);
+colorbar;
+xlabel('X(Metres)'); ylabel('Y(Metres)');
+title('Plot of Contour Lines with 2m Interval')
+
+%trend surface plot
+figure()
+mesh(Xgrid,Ygrid,Zgrid);%3D plot
+axis tight; 
+hold on;
+plot3(X,Y,Z,'.','MarkerSize',15)%points on surface
+xlabel('X(Metres)'); ylabel('Y(Metres)'); zlabel('Z(Metres)')
+title('Plot of Trend Surface')
+ 
+end
