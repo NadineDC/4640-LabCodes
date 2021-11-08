@@ -1,0 +1,193 @@
+%%% This code was used in programming local interpolation methods for ESSE 4640 LAB 4
+
+%% QUESTION 1 - Creating a grid
+%reading the data in
+read = importdata('DTM_Lab4_XYZ_F2021.txt');
+DEM = read.data;
+X = DEM(:,1); 
+Y = DEM(:,2); 
+Z = DEM(:,3);
+
+% grid formation
+
+LLX = 2000; % GRID BOUNDARIES
+URX = 7000;
+LLY = 1000;
+URY = 4000;
+
+xlimit = 2000:100:7000;
+ylimit = 4000:-100:1000;
+[x_grid,y_grid] = meshgrid(xlimit,ylimit);%making grid matrix using limits
+
+% Finding  the number of values within the grid limits
+track=0;
+for i = 1:length(DEM)
+     if X(i)>=LLX && X(i)<=URX && Y(i)>=LLY && Y(i)<=URY
+         track=track+1;
+         X_within(track) = X(i);
+         Y_within(track) = Y(i);
+     end
+end
+ 
+
+%% Question 2: Finding the elevations of the 15 Nearest Neighbors
+n = 15;
+Z_w1 = zeros(length(X_within),1);
+Z_w2 = zeros(length(X_within),1);
+Z_w3 = zeros(length(X_within),1);
+Z_Nearest = zeros(length(X_within),1);
+Nearest_Neigh = [];
+d = [];
+track=0;
+
+for i = 1:length(DEM)
+    if X(i)>=LLX && X(i)<=URX && Y(i)>=LLY && Y(i)<=URY
+        d = sqrt((X(:,1)-X(i)).^2 + (Y(:,1)-Y(i)).^2); % all distances with respect to point of interest
+        [Distance,index] = sort(d);%sorting distances in ascending order
+        index(index==i) = []; % deleting the index of the interested point
+        Nearest_Neigh = index(1:n); % selecting the 15 nearest points
+
+        % Weights
+        w_1 = 1./(d(Nearest_Neigh).^1);
+        w_2 = 1./(d(Nearest_Neigh).^2);
+        w_3 = 1./(d(Nearest_Neigh).^5);
+
+        %Interpolated elevation values
+        track=track+1;
+        Z_w1(track) = (sum(w_1.*Z(Nearest_Neigh)))/sum(w_1);
+        Z_w2(track) = (sum(w_2.*Z(Nearest_Neigh)))/sum(w_2);
+        Z_w3(track) = (sum(w_3.*Z(Nearest_Neigh)))/sum(w_3);
+
+        % Question 3: Nearest Neighbour Method Elevation Determination
+        nearest_neighb = index(1); % selecting the nearest neighbour
+        Z_Nearest(track) = Z(nearest_neighb); 
+    end
+end
+
+%% Question 4 - ELEVATION DIFFERENCES AND THEIR STATISTICS
+
+%differences
+v1 = Z_Nearest - Z_w1;
+v2 = Z_Nearest - Z_w2;
+v3 = Z_Nearest - Z_w3;
+v = [v1 v2 v3];
+
+%statistics of the differences
+for i = 1:3
+    mean_v(i) = mean(v(:,i));
+    sd(i) = std(v(:,i));
+    RMSE(i) = sqrt(mean((-v(:,i)).^2));
+    min_v(i) = min(v(:,i));
+    max_v(i) = max(v(:,i));
+    range_v(i) = range(v(:,i));
+end
+
+%% TASK 5 - PLOTS FOR VISUALIZING DATA
+%taking X,Y coordinates of points that fall in grid bounds 
+
+%spatial relationship of input data and grid points
+%grid plot with points
+figure()
+plot(X,Y,'.','MarkerSize',10)
+hold on
+plot(x_grid,y_grid,'k',x_grid.',y_grid.','k')
+xlabel('X (Metres)'); ylabel('Y (Metres)');
+title('Plot of Spatial Relationship of Input Data and Grid Points')
+
+%newly generated grid DEMs
+%IDW Methods
+%interpolated grid data
+w1_Z = griddata(X_within,Y_within,Z_w1,x_grid,y_grid);
+w2_Z = griddata(X_within,Y_within,Z_w2,x_grid,y_grid);
+w3_Z = griddata(X_within,Y_within,Z_w3,x_grid,y_grid);
+Nearest_Z = griddata(X_within,Y_within,Z_Nearest,x_grid,y_grid);
+
+%Visualization
+%w = 1/d
+figure()
+mesh(x_grid,y_grid,w1_Z)
+axis tight; 
+hold on;
+plot3(X_within,Y_within,Z_w1,'.','MarkerSize',15)
+xlabel('X(Metres)'); 
+ylabel('Y(Metres)'); 
+zlabel('Z(Metres)')
+title('Plot of IDW Grid Surface with w=1/d')
+colorbar;
+
+%w = 1/d^2
+figure()
+mesh(x_grid,y_grid,w2_Z)
+axis tight; 
+hold on;
+plot3(X_within,Y_within,Z_w2,'.','MarkerSize',15)
+xlabel('X(Metres)'); 
+ylabel('Y(Metres)'); 
+zlabel('Z(Metres)')
+title('Plot of IDW Grid Surface with w = 1/d^2 ')
+colorbar;
+
+%w = 1/d^5
+figure()
+mesh(x_grid,y_grid,w3_Z)
+axis tight; 
+hold on;
+plot3(X_within,Y_within,Z_w3,'.','MarkerSize',15)
+xlabel('X(Metres)'); 
+ylabel('Y(Metres)'); 
+zlabel('Z(Metres)')
+title('Plot of IDW Grid Surface with w = 1/d^5 ')
+colorbar;
+
+%Nearest Neighbour Method
+%interpolated grid data
+figure()
+mesh(x_grid,y_grid,Nearest_Z)
+axis tight; 
+hold on;
+plot3(X_within,Y_within,Z_Nearest,'.','MarkerSize',15)
+xlabel('X(Metres)'); 
+ylabel('Y(Metres)');
+zlabel('Z(Metres)')
+title('Plot of Grid Surface Generated using Nearest Neighbour')
+colorbar;
+
+%Elevation differences or residuals
+%NN vs IDW:1/d
+V1 = griddata(X_within,Y_within,v1,x_grid,y_grid);
+figure()
+mesh(x_grid,y_grid,V1)
+axis tight; 
+hold on;
+plot3(X_within,Y_within,v1,'.','MarkerSize',15)
+xlabel('X(Metres)');
+ylabel('Y(Metres)'); 
+zlabel('Difference (Metres)')
+title('Plot of Grid Surface of Elevation Difference between NN and IDW:w=1/d')
+colorbar;
+
+%NN vs IDW:1/d^2
+V2 = griddata(X_within,Y_within,v2,x_grid,y_grid);
+figure()
+mesh(x_grid,y_grid,V2)
+axis tight; 
+hold on;
+plot3(X_within,Y_within,v2,'.','MarkerSize',15)
+xlabel('X(Metres)'); 
+ylabel('Y(Metres)'); 
+zlabel('Difference (Metres)')
+title('Plot of Grid Surface of Elevation Difference between NN and IDW:w=1/d^2')
+colorbar;
+
+%NN vs IDW:1/d^5
+V3 = griddata(X_within,Y_within,v3,x_grid,y_grid);
+figure()
+mesh(x_grid,y_grid,V3)
+axis tight; 
+hold on;
+plot3(X_within,Y_within,v3,'.','MarkerSize',15)
+xlabel('X(Metres)'); 
+ylabel('Y(Metres)'); 
+zlabel('Difference (Metres)')
+title('Plot of Grid Surface of Elevation Difference between NN and IDW:w=1/d^5')
+colorbar;
