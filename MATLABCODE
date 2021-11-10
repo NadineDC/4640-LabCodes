@@ -1,3 +1,4 @@
+%% LAB 2 %%%
 %% This code is designed to read in an image in the ESRI ASCII GRID format. It calculates the gradeint, slope, aspect for both 4 and 8 neighboring points.
 %% It also calculates the contour with an interval of 5 meters.
 
