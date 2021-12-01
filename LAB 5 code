@@ -1,0 +1,183 @@
+%% IMPORTING DATA
+XYZ = importdata('ESSE4640_Lab_5_XYZ_F2021 (2).txt');
+XYZ_Data = XYZ.data;
+X(:,1) = XYZ_Data(1:20,2); 
+Y(:,1) = XYZ_Data(1:20,3); 
+Z(:,1) = XYZ_Data(1:20,4);
+P=[725.1,535.5];
+ 
+%% Part 1 - COMPUTING SEMI-VARIANCE AND PLOTTING SEMI-VARIOGRAM
+% Distance calculation 
+for i = 1:20
+    distance(i,:) = sqrt((X(:)-X(i)).^2 + (Y(:)-Y(i)).^2);
+    
+end
+
+% Semivariance calculation
+for i=1:20
+    for j = i:20
+        semiV(i,j) = (1/2)*(Z(i)-Z(j))^2;
+        semiV(j,i) = (1/2)*(Z(i)-Z(j))^2;
+    end
+end
+ 
+ % Vectors containing the average semeivariance for each set of distances within an interval
+ interval5 = 0;
+ interval10 = 0; 
+ interval15 = 0; 
+ interval20 = 0; 
+ interval25 = 0; 
+ pair4 = 0;
+ pair1 = 0;
+ pair2 = 0;
+ pair3 = 0;
+ pair5 = 0;
+
+ for i = 1:20
+     for j = 1:20
+         if distance(i,j) > 0 && distance(i,j) <= 5
+             pair1 = pair1 + 1;
+             interval5 = semiV(i,j) + interval5;
+         end
+         if distance(i,j) > 5 && distance(i,j) <= 10
+             pair2 = pair2 + 1;
+             interval10 = semiV(i,j) + interval10;
+         end
+         if distance(i,j) > 10 && distance(i,j) <= 15
+             pair3 = pair3 + 1;
+             interval15 = semiV(i,j) + interval15;
+         end
+         if distance(i,j) > 15 && distance(i,j) <= 20
+             pair4 = pair4 + 1;
+             interval20 = semiV(i,j) + interval20;
+         end
+         if distance(i,j) > 20 && distance(i,j) <= 25
+             pair5 = pair5 + 1;
+             interval25 = semiV(i,j) + interval25;
+         end
+     end
+ end
+ 
+ %average semivariance based on number of pairs
+ avgsemiv_1 = interval5/pair1;
+ avgsemiv_2 = interval10/pair2;
+ avgsemiv_3 = interval15/pair3;
+ avgsemiv_4 = interval20/pair4;
+ avgsemiv_5 = interval25/pair5;
+ avgsemi = [avgsemiv_1 avgsemiv_2 avgsemiv_3 avgsemiv_4 avgsemiv_5];
+ bins = [2.5 7.5 12.5 17.5 22.5];
+ ranges=range(bins);
+ 
+ %y= 0.3214d + 6.161 The equation was retreived from Exel using the Trend
+ %line option with means and bins as the imputs.
+
+ m = 0.3214;%slope
+ n = 6.161;%nugget
+ y = m*bins(1:3) + n;
+ yy=m*ranges + n;
+ y(4:5) = yy;
+ v = y - avgsemi;
+
+ model = m*distance + n;
+ indx = find(distance<=15);
+ cap = max(model(indx));
+ for i = 1:20
+     for j = 1:20
+         if distance(i,j) == 0
+             model(i,j) = 0;
+         end
+         if distance(i,j) > 15
+             model(i,j) = cap;
+         end
+     end
+ end
+ 
+ 
+ %% KRIGING
+ % SIMPLE KRINGING EQUATIONS
+ d_P = sqrt((X(:)-P(1)).^2 + (Y(:)-P(2)).^2);%distance between point P and others
+ %fitting P into linear model for semi-variance
+ modeP = m*d_P + n;
+ %making distances > 15m the sill value
+ index = find(d_P <= 15);
+ cap_P = max(modeP(index));
+ for i = 1:20
+     if  d_P(i) > 15
+         modeP(i) = cap_P;
+     end
+ end
+ 
+ %performing simple kriging
+ G = model;%symmetric design matrix
+ g = modeP;%observation vector
+ w = inv(G)*g; %weight
+ 
+ Z_P = sum(w.*Z);%estimated elevation of P
+ var = sum(w.*g);%variance of estimated error
+ sd = sqrt(var);%standard deviation of estimated error
+ sum_w = sum(w);%summation of weights
+ estimates=[Z_P ;var;sd;sum_w];
+
+ % ORDINARY KRIGING
+ %setting up design matrix for ordinary kriging
+ G1 = model;%symmetric design matrix
+ %adding the lagrange coefficient
+ G1(21,21) = 0; 
+ G1(21,1:20) = 1; 
+ G1(1:20,21) = 1;
+ g1 = [modeP;1];
+ w1 = inv(G1)*g1;% weights and Lagrange coefficient
+ 
+ Z_P1 = sum(w1(1:20).*Z);%estimated elevation of P
+ var1 = sum(w1.*g1);%variance of estimated error
+ sd1 = sqrt(var1);%standard deviation of estimated error
+ sum_w1 = sum(w1(1:20));%summation of weights
+ estimates1=[Z_P1;var1;sd1;sum_w1];
+
+ %UNIVERSAL KRIGING
+ %setting up design matrix for universal kriging
+ G2 = zeros(23,23);
+ G2(1:20,1:20) = model;
+ G2(21,1:20) = 1;
+ G2(22,1:20) = X;
+ G2(23,1:20) = Y;
+ G2(1:20,21) = 1;
+ G2(1:20,22) = X;
+ G2(1:20,23) = Y;
+ %setting up observation vector
+ g2 = zeros(23,1);
+ g2(1:20) = modeP;
+ g2(21:23) = [1 P(1) P(2)];
+ 
+ %computing weights, lagrange coefficient and coefficients of the trend
+ %surface
+ w2 = inv(G2)*g2;
+ Z_P2 = sum(w2(1:20).*Z);%estimated elevation of P
+ var2 =sum(w2.*g2);
+ sd2 = sqrt(var2);%standard deviation of estimated error
+ sum_w2 = sum(w2(1:20));%summation of weights
+ estimates2=[Z_P2;var2;sd2;sum_w2];
+ estimate5=[estimates,estimates1,estimates2];
+
+ %% Part 2 - IDW METHOD OF ESTIMATING ELEVATIONS
+w3 = d_P.^-2;%weights of the points
+Z_P3 = (sum(w3.*Z))/sum(w3);%estimated Z of point P
+
+ % differences between kriging methods and IDW method
+krigs = [Z_P Z_P1 Z_P2];
+difference = Z_P3 - krigs;
+ 
+ %% Making a plot which includes the interpolated points
+figure() 
+ref_points = plot3(X,Y,Z,'+','MarkerSize',10);%points on surface
+hold on;
+simp = plot3(P(1),P(2),Z_P,'r.','MarkerSize',15);%simple kriging
+ord = plot3(P(1),P(2),Z_P1,'k.','MarkerSize',15);%ordinary kriging
+uni = plot3(P(1),P(2),Z_P2,'g.','MarkerSize',15);%universal kriging
+IDWW = plot3(P(1),P(2),Z_P3,'mp','MarkerSize',15);%IDW method
+xlabel('X(Metres)'); 
+ylabel('Y(Metres)'); 
+zlabel('Z(Metres)')
+title('Plot of all Reference Points and the estimated Z values for P')
+%colorbar;
+legend([ref_points simp ord uni IDWW],'Reference Points','Simple Kriging','Ordinary Kriging','Universal Kriging','IDW');
